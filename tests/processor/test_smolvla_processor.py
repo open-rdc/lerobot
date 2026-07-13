@@ -23,6 +23,10 @@ import torch
 from lerobot.configs.types import FeatureType, NormalizationMode, PipelineFeatureType, PolicyFeature
 from lerobot.policies.smolvla.configuration_smolvla import SmolVLAConfig
 from lerobot.policies.smolvla.processor_smolvla import make_smolvla_pre_post_processors
+from lerobot.policies.smolvla.waypoint_action_processor import (
+    WaypointRebaseProcessorStep,
+    WaypointUnscaleProcessorStep,
+)
 from lerobot.processor import (
     AddBatchDimensionProcessorStep,
     DeviceProcessorStep,
@@ -103,18 +107,20 @@ def test_make_smolvla_processor_basic():
     assert postprocessor.name == "policy_postprocessor"
 
     # Check steps in preprocessor
-    assert len(preprocessor.steps) == 6
+    assert len(preprocessor.steps) == 7
     assert isinstance(preprocessor.steps[0], RenameObservationsProcessorStep)
     assert isinstance(preprocessor.steps[1], AddBatchDimensionProcessorStep)
     assert isinstance(preprocessor.steps[2], NewLineTaskProcessorStep)
     # Step 3 would be TokenizerProcessorStep but it's mocked
     assert isinstance(preprocessor.steps[4], DeviceProcessorStep)
-    assert isinstance(preprocessor.steps[5], NormalizerProcessorStep)
+    assert isinstance(preprocessor.steps[5], WaypointRebaseProcessorStep)
+    assert isinstance(preprocessor.steps[6], NormalizerProcessorStep)
 
     # Check steps in postprocessor
-    assert len(postprocessor.steps) == 2
+    assert len(postprocessor.steps) == 3
     assert isinstance(postprocessor.steps[0], UnnormalizerProcessorStep)
-    assert isinstance(postprocessor.steps[1], DeviceProcessorStep)
+    assert isinstance(postprocessor.steps[1], WaypointUnscaleProcessorStep)
+    assert isinstance(postprocessor.steps[2], DeviceProcessorStep)
 
 
 def test_smolvla_newline_processor_single_task():
@@ -425,8 +431,8 @@ def test_smolvla_processor_bfloat16_device_float32_normalizer():
             modified_steps.append(step)
     preprocessor.steps = modified_steps
 
-    # Verify initial normalizer configuration (SmolVLA has NormalizerProcessorStep at index 5)
-    normalizer_step = preprocessor.steps[5]  # NormalizerProcessorStep
+    # Verify initial normalizer configuration (SmolVLA has NormalizerProcessorStep at index 6)
+    normalizer_step = preprocessor.steps[6]  # NormalizerProcessorStep
     assert normalizer_step.dtype == torch.float32
 
     # Create test data with both state and visual observations

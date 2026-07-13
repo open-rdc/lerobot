@@ -29,11 +29,15 @@ class SmolVLAConfig(PreTrainedConfig):
     chunk_size: int = 50
     n_action_steps: int = 50
 
+    # ACTIONはIDENTITY: waypoint形式([x,y,cos,sin]の絶対姿勢chunk)ではWaypointRebaseProcessorStepが
+    # 独自スケール(WAYPOINT_POS_SCALE)で正規化するため、データセット統計ベースのMEAN_STDは使わない。
+    # meta/stats.jsonのaction統計(生の絶対座標なので巨大な値になりうる)をそのまま適用すると
+    # rebase後の小さな相対オフセットのスケールと噛み合わず学習が破綻するため。
     normalization_mapping: dict[str, NormalizationMode] = field(
         default_factory=lambda: {
             "VISUAL": NormalizationMode.IDENTITY,
             "STATE": NormalizationMode.MEAN_STD,
-            "ACTION": NormalizationMode.MEAN_STD,
+            "ACTION": NormalizationMode.IDENTITY,
         }
     )
 

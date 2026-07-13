@@ -34,6 +34,7 @@ from lerobot.processor import (
 from lerobot.utils.constants import POLICY_POSTPROCESSOR_DEFAULT_NAME, POLICY_PREPROCESSOR_DEFAULT_NAME
 
 from .configuration_smolvla import SmolVLAConfig
+from .waypoint_action_processor import WaypointRebaseProcessorStep, WaypointUnscaleProcessorStep
 
 
 def make_smolvla_pre_post_processors(
@@ -66,6 +67,15 @@ def make_smolvla_pre_post_processors(
         A tuple containing the configured pre-processor and post-processor pipelines.
     """
 
+    # 各waypointが現在姿勢を共通原点とした絶対オフセット([x,y,cos,sin]->[dx,dy,hx,hy])を
+    # 使うaction_dim=4のデータセットでのみ有効化する。既存のaction_dim=2チェックポイントは
+    # 自身のシリアライズ済みprocessor configをロードするため影響を受けない。
+    use_waypoint_actions = config.action_feature is not None and config.action_feature.shape[0] == 4
+    waypoint_rebase = WaypointRebaseProcessorStep(enabled=use_waypoint_actions)
+    waypoint_unscale = WaypointUnscaleProcessorStep(
+        enabled=use_waypoint_actions, pos_scale=waypoint_rebase.pos_scale
+    )
+
     input_steps = [
         RenameObservationsProcessorStep(rename_map={}),  # To mimic the same processor as pretrained one
         AddBatchDimensionProcessorStep(),
@@ -77,6 +87,7 @@ def make_smolvla_pre_post_processors(
             max_length=config.tokenizer_max_length,
         ),
         DeviceProcessorStep(device=config.device),
+        waypoint_rebase,  # 学習時: [x,y,cos,sin]の絶対姿勢chunkをt=0原点のwaypointに変換
         NormalizerProcessorStep(
             features={**config.input_features, **config.output_features},
             norm_map=config.normalization_mapping,
@@ -87,6 +98,7 @@ def make_smolvla_pre_post_processors(
         UnnormalizerProcessorStep(
             features=config.output_features, norm_map=config.normalization_mapping, stats=dataset_stats
         ),
+        waypoint_unscale,  # pos_scaleの除算を戻す(回転/再原点化はモデル出力がそのまま欲しい形なので戻さない)
         DeviceProcessorStep(device="cpu"),
     ]
     return (
