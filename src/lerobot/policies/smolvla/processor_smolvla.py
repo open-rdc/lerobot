@@ -34,6 +34,7 @@ from lerobot.processor import (
 from lerobot.utils.constants import POLICY_POSTPROCESSOR_DEFAULT_NAME, POLICY_PREPROCESSOR_DEFAULT_NAME
 
 from .configuration_smolvla import SmolVLAConfig
+from .paraphrase_processor import ParaphraseAugmentProcessorStep
 from .waypoint_action_processor import WaypointRebaseProcessorStep, WaypointUnscaleProcessorStep
 
 
@@ -49,11 +50,13 @@ def make_smolvla_pre_post_processors(
 
     The pre-processing pipeline prepares input data for the model by:
     1.  Renaming features to match pretrained configurations.
-    2.  Normalizing input and output features based on dataset statistics.
-    3.  Adding a batch dimension.
+    2.  Adding a batch dimension.
+    3.  Optionally swapping the task description for a random paraphrase (training only;
+        no-op unless config.paraphrase_augment_path is set).
     4.  Ensuring the language task description ends with a newline character.
     5.  Tokenizing the language task description.
     6.  Moving all data to the specified device.
+    7.  Normalizing input and output features based on dataset statistics.
 
     The post-processing pipeline handles the model's output by:
     1.  Moving data to the CPU.
@@ -79,6 +82,9 @@ def make_smolvla_pre_post_processors(
     input_steps = [
         RenameObservationsProcessorStep(rename_map={}),  # To mimic the same processor as pretrained one
         AddBatchDimensionProcessorStep(),
+        # 学習時: task文字列をパラフレーズ集合からランダムに差し替える(map_path未設定ならno-op)。
+        # NewLineTask/Tokenizerより前に置き、差し替え後の文字列がトークナイズされるようにする。
+        ParaphraseAugmentProcessorStep(map_path=config.paraphrase_augment_path),
         NewLineTaskProcessorStep(),
         TokenizerProcessorStep(
             tokenizer_name=config.vlm_model_name,

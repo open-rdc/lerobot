@@ -96,6 +96,13 @@ class SmolVLAConfig(PreTrainedConfig):
 
     pad_language_to: str = "longest"  # "max_length"
 
+    # Path to a JSON file mapping each dataset task string to a list of paraphrases
+    # (same landmark/direction words, different wording). When set, a random pick from
+    # [original, *paraphrases] replaces the task text each time a frame is sampled, so a
+    # frame gets a different phrasing on different epochs instead of one fixed string for
+    # the whole run. None (default) disables this -- the task text passes through unchanged.
+    paraphrase_augment_path: str | None = None
+
     num_expert_layers: int = -1  # Less or equal to 0 is the default where the action expert has the same number of layers of VLM. Otherwise the expert have less layers.
     num_vlm_layers: int = 16  # Number of layers used in the VLM (first num_vlm_layers layers)
     self_attn_every_n_layers: int = 2  # Interleave SA layers each self_attn_every_n_layers
